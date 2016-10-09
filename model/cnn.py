@@ -4,57 +4,64 @@ Convolutional Neural Network
 @author TaoPR (github.com/starcolon)
 """
 
+import numpy as np
 from theano import *
 from theano import tensor as T
-from scipy import *
-import numpy as np
-import lasagne
-from lasagne import layers
-from lasagne.updates import nesterov_momentum
-from lasagne.objectives import *
-from nolearn.lasagne import NeuralNet
-from nolearn.lasagne import visualize
+from theano.tensor import tensor4, lvector, mean, neq
+from opendeep import config_root_logger
+from opendeep.data import ModifyStream
+from opendeep.models import Prototype, Conv2D, Dense, Softmax
+from opendeep.models.utils import Pool2D, Flatten
+from opendeep.monitor import Monitor, FileService
+from opendeep.optimization.loss import MSE
+from opendeep.optimization import SGD, AdaDelta
+
 from termcolor import colored
 from . import *
 
 class CNN():
 
   """
-  @param {int} dimension of feature vector
+  @param {(int,int)} dimension of feature vector (w,h)
+  @param {int} dimension of the final vector
+  @param {str} working directory
   """
-  def __init__(self, image_dim, final_vec_dim):
+  def __init__(self, image_dim, final_vec_dim, dirw):
+    img_shape = (3,) + image_dim
+    img_var   = tensor4('xs')
 
-    l1 = ('input',   layers.InputLayer)
-    l2 = ('conv1',   layers.Conv2DLayer)
-    l3 = ('pool1',   layers.MaxPool2DLayer)
-    l4 = ('conv2',   layers.Conv2DLayer)
-    l5 = ('pool2',   layers.MaxPool2DLayer)
-    l6 = ('hidden1', layers.DenseLayer)
-    l7 = ('output',  layers.DenseLayer)
+    # Register working directory
+    self.dir  = dirw
 
-    # Create a NN structure
-    print('...Building initial structure')
-    print('...input size of  : ', image_dim)
-    print('...output size of : ', final_vec_dim)
-    self.net = NeuralNet(
-      layers=[l1, l2, l3, l4, l5, l6, l7],
-      input_shape=(None,) + image_dim,
-      conv1_num_filters=16, conv1_filter_size=(7, 7), 
-      pool1_pool_size=(3, 3),
-      conv2_num_filters=10, conv2_filter_size=(3, 3),
-      pool2_pool_size=(2, 2),
-      hidden1_num_units=128,
-      output_num_units=final_vec_dim, output_nonlinearity=None,
-      update_learning_rate=0.01,
-      update_momentum=0.8,
-      regression=True,
-      max_epochs=150,
-      objective_loss_function=squared_error,
-      verbose=1
-      )
+    self.net  = Prototype()
+    # First convnet layer
+    self.net.add(Conv2D(inputs=(img_shape, img_var)),n_filters=100, filter_size=(5,5))
+    self.net.add(Pool2D,size=(3,3))
+    # Second convnet layer
+    self.net.add(Conv2D(n_filters=50, filter_size=(3,3)))
+    self.net.add(Pool2D,size=(2,2))
+    # 3D => 2D flatten
+    self.net.add(Flatten,ndim=2)
+    # Ordinary hidden layers
+    self.net.add(Dense(outputs=128, activation='relu'))
+    self.net.add(Dense(outputs=40, activation='relu'))
 
-  def train(self,X,y):
-    self.net.fit(X,y)
+
+  def train(self,X,y,epoch):
+    target_v  = dvector('y')
+    loss      = MSE(
+      inputs=self.net.models[-1].p_y_given_x,
+      targets=y,
+      one_hot=False)
+
+    error_monitor = Monitor(
+      name='error', 
+      expression=mean(neq(lenet.models[-1].y_pred, y)), 
+      valid=True, test=True, 
+      out_service=FileService(self.dirw + '/train_error.txt'))
+
+    optimiser = AdaDelta(model=self.net, loss=loss, dataset=X, epoch=epoch)
+    optimiser.train(monitor_channels=error_monitor)
 
   def predict(self,candidates):
     return self.net.predict(candidates)
