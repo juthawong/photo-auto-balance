@@ -18,12 +18,13 @@ Train the CNN model with the given dataset
 @param {y-validation}
 @param {(int,int)} dimentions of image
 @param {int} dimension of output vector
+@param {str} working directory
 """
-def train_model(X, y, X_, y_, image_dim, final_vec_dim):
+def train_model(X, y, X_, y_, image_dim, final_vec_dim, dirw):
 
   # Create a new CNN
   print(colored('Creating a new CNN.','green'))
-  cnn = CNN(image_dim,final_vec_dim)
+  cnn = CNN(image_dim, final_vec_dim, dirw)
   
   # Train the network
   print(colored('Training started.','green'))
