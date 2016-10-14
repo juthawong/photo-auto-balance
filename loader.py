@@ -23,6 +23,7 @@ from model.core import *
 arguments = argparse.ArgumentParser()
 arguments.add_argument('--debug', dest='debug', action='store_true')
 arguments.add_argument('--limit', type=int, default=None) # Limit the number of samples to process
+arguments.add_argument('--epoch', type=int, default=100) # Max number of epochs to run
 arguments.add_argument('--dir', type=str, default='./data/raw/') # Where to pick the samples
 arguments.add_argument('--train', dest='train', action='store_true') # Training mode
 arguments.add_argument('--ratio', type=float, default=0.8) # Ratio of the training set for cross validation
@@ -105,7 +106,9 @@ def train(samples):
       validsetY,
       shape_x, 
       shape_y[0],
-      args['dir'] + '/../')
+      args['dir'] + '/../',
+      args['ratio'],
+      args['epoch'])
 
     # Serialise the model
     path_model = args['dir'] + '../model.cnn'
